@@ -1,101 +1,121 @@
-import requests
-import concurrent.futures
-import pandas as pd
+import logging
 import time
+from datetime import datetime, timedelta
 import pygsheets
-from datetime import datetime
+import pandas as pd
+import schedule
+from keep_alive import keep_alive
+from pytz import timezone
 
-def fetch_option_data(option):
-    # Function to fetch data for a single option
-    return {
-        'calls_oi': option['calls_oi'],
-        'calls_change_oi': option['calls_change_oi'],
-        'calls_volume': option['calls_volume'],
-        'calls_ltp': option['calls_ltp'],
-        'calls_net_change': option['calls_net_change'],
-        'calls_iv': option['calls_iv'],
-        'calls_open': option['call_open'],
-        'calls_high': option['call_high'],
-        'calls_low': option['call_low'],
-        'strike_price': option['strike_price'],
-        'puts_oi': option['puts_oi'],
-        'puts_change_oi': option['puts_change_oi'],
-        'puts_volume': option['puts_volume'],
-        'puts_ltp': option['puts_ltp'],
-        'puts_net_change': option['puts_net_change'],
-        'puts_iv': option['puts_iv'],
-        'puts_open': option['put_open'],
-        'puts_high': option['put_high'],
-        'puts_low': option['put_low'],
-        'spotprice': option['index_close'],
-  # Added symbol_name to extract the symbol name
-    }
+logging.basicConfig(filename='app.log', level=logging.INFO)
 
-def fetch_option_chain_data(api_url):
-    response = requests.get(api_url)
+def get_previous_weekday(date, holiday_list):
+    while date.weekday() > 4 or date.strftime("%Y-%m-%d") in holiday_list:
+        date -= timedelta(days=1)
+    return date
+global weeklyexpiry
 
-    if response.status_code == 200:
-        data = response.json()
-        op_datas = data['resultData']['opDatas']
+# Read the holiday list from CSV
+holidays = pd.read_csv('holidays.csv')
+dates_list = holidays['Day'].tolist()
 
-        # Use ThreadPoolExecutor to parallelize the API requests
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            options_data = list(executor.map(fetch_option_data, op_datas))
+# Get the current date and find the next Thursday
+today = datetime.today()
+weeklyexpiry = today + timedelta(days=(3 - today.weekday() + 7) % 7)
 
-        # Creating a DataFrame
-        df = pd.DataFrame(options_data)
+# Check if the expiry date is a holiday or weekend, and find the previous valid weekday
 
+
+# Find the first day of the next month
+
+# Calculate the last day of the current month by subtracting one day from the first day of the next month
+
+
+# Calculate the weekday of the last day of the current month (0 = Monday, 1 = Tuesday, ..., 6 = Sunday)
+
+
+bnfexpiry = today + timedelta(days=(2 - today.weekday() + 7) % 7)
+
+# Check if the expiry date is a holiday or weekend, and find the previous valid weekday
+weeklyexpiry = get_previous_weekday(weeklyexpiry, dates_list)
+bnfexpiry = get_previous_weekday(bnfexpiry, dates_list)
+weeklyexpiry=weeklyexpiry.strftime("%Y-%m-%d")
+bnfexpiry=bnfexpiry.strftime("%Y-%m-%d")
+
+# Print the result
+print(bnfexpiry+weeklyexpiry)
+
+def fetch_data(url):
+    try:
+        df = pd.read_html(url)[0]
+        df.replace('-', '0', inplace=True)
         return df
-    else:
-        print(f"Error: {response.status_code}, {response.text}")
+    except Exception as e:
+        logging.error(f"Error fetching data from {url}: {e}")
         return None
 
-def run_program(url_info):
-    api_url = url_info['api_url']
+def update_google_sheets(gc, sheet_name, dataframe):
+    try:
+        sh = gc.open(sheet_name)
+        worksheet = sh[0]
+        worksheet.set_dataframe(dataframe, (2, 1))
+        logging.info(f"Data updated successfully in Google Sheets ({sheet_name}).")
+    except Exception as e:
+        logging.error(f"Error updating Google Sheets ({sheet_name}): {e}")
 
-    option_chain_df = fetch_option_chain_data(api_url)
+def datafetch():
+    try:
+        nftdf1 = pd.read_html(f'https://www.moneycontrol.com/india/indexfutures/nifty/9/{weeklyexpiry}/OPTIDX/CE/18500.00/true')
+        nftresult = nftdf1[4]
+        #nftresult
+        nftresult2= nftresult.replace('-','0')
+        nftdf2 = pd.read_html('https://www.moneycontrol.com/india/indexfutures/nifty/9/2022-06-02/OPTIDX/CE/14300.00/true')
+        nftresult1=nftdf2[0]
+        #nftresult2.to_csv('nftoc.csv',index=False,header=True)
+        niftyspot = nftresult1.iat[4,1]
+        bnfdf1 = pd.read_html(f'https://www.moneycontrol.com/india/indexfutures/banknifty/23/{bnfexpiry}/OPTIDX/CE/43900.00/true')
+        bnfresult = bnfdf1[4]
+        #bnfresult
+        bnfresult2= bnfresult.replace('-','0')
+        bnfdf2 = pd.read_html('https://www.moneycontrol.com/india/indexfutures/banknifty/23/2022-06-09/OPTIDX/CE/28900.00/true')
+        bnfresult1=bnfdf2[0]
+        bankniftyspot = bnfresult1.iat[4,1]
+        now = datetime.now(timezone('Asia/Kolkata'))
+        current_time = now.strftime("%H:%M:%S")
+        current_time
+        frames =[nftresult2,nftresult1]
+        result = pd.concat([nftresult2,nftresult1],axis=1)
+        result1 = pd.concat([bnfresult2,bnfresult1],axis=1)
 
-    if option_chain_df is not None:
-        print(option_chain_df)
-        gc = pygsheets.authorize(service_account_file='creds1.json')
-        sh = gc.open('option_data')  # Replace with your actual Google Sheets document name
+        #nftresult1 =nftresult.sort_values(by=['CHANGEOIPER'])
+        #print(nftresult1)
+        print(result)
+        #nftresult2 = pd.read_csv('nftoc.csv')
+        path=r'C:\Users\SMAA\creds.json'
+        gc=pygsheets.authorize(service_account_file='creds1.json')
+        sh=gc.open('NFTSOURCE2109')
+        wk1=sh[0]
+        wk2=sh[1]
+        wk3=sh[2]
+        wk1.set_dataframe(result,(2,1))
+        wk2.set_dataframe(result1,(2,1))
+        print(current_time+' '+'DATA RECORDED SUCCESSFULLY')
+    #schedule.every(1).minutes.do(datafetch)
 
-        # Map predefined names to URLs
-        predefined_symbol_names = {
-           
-            'https://webapi.niftytrader.in/webapi/option/fatch-option-chain?symbol=nifty&expiryDate=': 'nityprice',
-            # Add more mappings for additional URLs
-        }
+        now = datetime.now(timezone('Asia/Kolkata'))
+        current_time = now.strftime("%H:%M:%S")
+        logging.info(f"{current_time} - Data recorded successfully.")
+    except Exception as e:
+        logging.error(f"Error in datafetch: {e}")
+        raise  # Re-raise the exception to restart the program
 
-        # Extract the URL from the dictionary
-        current_url = url_info['api_url']
+if __name__ == "__main__":
+    keep_alive()
+    gc = pygsheets.authorize(service_account_file='creds1.json')
 
-        # Extract the predefined symbol name or use the URL as a fallback
-        symbol_name = predefined_symbol_names.get(current_url, current_url)
-
-        # Find the worksheet with the same symbol name
-        worksheet = sh.worksheet_by_title(symbol_name)
-
-        if worksheet:
-            # If the worksheet exists, update its content
-            worksheet.set_dataframe(option_chain_df, (1, 1))
-            print(f'Data updated for {symbol_name} successfully')
-        else:
-            # If the worksheet doesn't exist, create a new worksheet
-            new_worksheet = sh.add_worksheet(symbol_name)
-            new_worksheet.set_dataframe(option_chain_df, (1, 1))
-            print(f'Data recorded for {symbol_name} successfully')
-
-# List of URLs
-url_infos = [
-     {'api_url': 'https://webapi.niftytrader.in/webapi/option/fatch-option-chain?symbol=nifty&expiryDate='},
-    # Add more dictionaries for additional URLs
-]
-
-
-# Run the program every 20 seconds for each URL
-while True:
-    for url_info in url_infos:
-        run_program(url_info)
-    time.sleep(50)
-
+    while True:
+        try:
+            datafetch()
+            time.sleep(5)
+        except Exception as e:
+            logging.error(f"Unhandled exception: {e}")
