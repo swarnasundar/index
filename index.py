@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 import pygsheets
 import pandas as pd
 import schedule
-from keep_alive import keep_alive
 from pytz import timezone
 
 logging.basicConfig(filename='app.log', level=logging.INFO)
@@ -110,7 +109,6 @@ def datafetch():
         raise  # Re-raise the exception to restart the program
 
 if __name__ == "__main__":
-    keep_alive()
     gc = pygsheets.authorize(service_account_file='creds1.json')
 
     while True:
