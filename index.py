@@ -58,7 +58,7 @@ def run_program(url_info):
 
     if option_chain_df is not None:
         print(option_chain_df)
-        gc = pygsheets.authorize(service_account_file='creds.json')
+        gc = pygsheets.authorize(service_account_file='creds1.json')
         sh = gc.open('option_data')  # Replace with your actual Google Sheets document name
 
         # Map predefined names to URLs
