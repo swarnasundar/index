@@ -1,120 +1,82 @@
 import streamlit as st
-import logging
-import time
-from datetime import datetime, timedelta
-import pygsheets
+from keep_alive import keep_alive
+import json
+from pytz import timezone 
 import pandas as pd
-import schedule
-from pytz import timezone
-
-logging.basicConfig(filename='app.log', level=logging.INFO)
-
-def get_previous_weekday(date, holiday_list):
-    while date.weekday() > 4 or date.strftime("%Y-%m-%d") in holiday_list:
-        date -= timedelta(days=1)
-    return date
-global weeklyexpiry
-
-# Read the holiday list from CSV
-holidays = pd.read_csv('holidays.csv')
-dates_list = holidays['Day'].tolist()
-
-# Get the current date and find the next Thursday
-today = datetime.today()
-weeklyexpiry = today + timedelta(days=(3 - today.weekday() + 7) % 7)
-
-# Check if the expiry date is a holiday or weekend, and find the previous valid weekday
-
-
-# Find the first day of the next month
-
-# Calculate the last day of the current month by subtracting one day from the first day of the next month
-
-
-# Calculate the weekday of the last day of the current month (0 = Monday, 1 = Tuesday, ..., 6 = Sunday)
-
-
-bnfexpiry = today + timedelta(days=(2 - today.weekday() + 7) % 7)
-
-# Check if the expiry date is a holiday or weekend, and find the previous valid weekday
-weeklyexpiry = get_previous_weekday(weeklyexpiry, dates_list)
-bnfexpiry = get_previous_weekday(bnfexpiry, dates_list)
-weeklyexpiry=weeklyexpiry.strftime("%Y-%m-%d")
-bnfexpiry=bnfexpiry.strftime("%Y-%m-%d")
-
-# Print the result
-print(bnfexpiry+weeklyexpiry)
-
-def fetch_data(url):
-    try:
-        df = pd.read_html(url)[0]
-        df.replace('-', '0', inplace=True)
-        return df
-    except Exception as e:
-        logging.error(f"Error fetching data from {url}: {e}")
-        return None
-
-def update_google_sheets(gc, sheet_name, dataframe):
-    try:
-        sh = gc.open(sheet_name)
-        worksheet = sh[0]
-        worksheet.set_dataframe(dataframe, (2, 1))
-        logging.info(f"Data updated successfully in Google Sheets ({sheet_name}).")
-    except Exception as e:
-        logging.error(f"Error updating Google Sheets ({sheet_name}): {e}")
-
+import numpy as np
+import time
+from datetime import datetime,timedelta,date
+import pygsheets
+from lxml import etree as et
+import calendar
+import pyrebase
 def datafetch():
-    try:
-        nftdf1 = pd.read_html(f'https://www.moneycontrol.com/india/indexfutures/nifty/9/{weeklyexpiry}/OPTIDX/CE/18500.00/true')
-        nftresult = nftdf1[4]
-        #nftresult
-        nftresult2= nftresult.replace('-','0')
-        nftdf2 = pd.read_html('https://www.moneycontrol.com/india/indexfutures/nifty/9/2022-06-02/OPTIDX/CE/14300.00/true')
-        nftresult1=nftdf2[0]
-        #nftresult2.to_csv('nftoc.csv',index=False,header=True)
-        niftyspot = nftresult1.iat[4,1]
-        bnfdf1 = pd.read_html(f'https://www.moneycontrol.com/india/indexfutures/banknifty/23/{bnfexpiry}/OPTIDX/CE/43900.00/true')
-        bnfresult = bnfdf1[4]
-        #bnfresult
-        bnfresult2= bnfresult.replace('-','0')
-        bnfdf2 = pd.read_html('https://www.moneycontrol.com/india/indexfutures/banknifty/23/2022-06-09/OPTIDX/CE/28900.00/true')
-        bnfresult1=bnfdf2[0]
-        bankniftyspot = bnfresult1.iat[4,1]
-        now = datetime.now(timezone('Asia/Kolkata'))
-        current_time = now.strftime("%H:%M:%S")
-        current_time
-        frames =[nftresult2,nftresult1]
-        result = pd.concat([nftresult2,nftresult1],axis=1)
-        result1 = pd.concat([bnfresult2,bnfresult1],axis=1)
-
-        #nftresult1 =nftresult.sort_values(by=['CHANGEOIPER'])
-        #print(nftresult1)
-        print(result)
-        #nftresult2 = pd.read_csv('nftoc.csv')
-        path=r'C:\Users\SMAA\creds1.json'
-        gc=pygsheets.authorize(service_account_file='creds1.json')
-        sh=gc.open('NFTSOURCE2109')
-        wk1=sh[0]
-        wk2=sh[1]
-        wk3=sh[2]
-        wk1.set_dataframe(result,(2,1))
-        wk2.set_dataframe(result1,(2,1))
-        print(current_time+' '+'DATA RECORDED SUCCESSFULLY')
+    firebaseConfig ={"apiKey": "AIzaSyDRCNxFhkbWwjanpPBGLBb7plPISrnhowU",
+    "authDomain": "dash-92a7e.firebaseapp.com",
+    "databaseURL": "https://dash-92a7e-default-rtdb.firebaseio.com/",
+    "projectId": "dash-92a7e",
+    "storageBucket": "dash-92a7e.appspot.com",
+    "messagingSenderId": "365112842534",
+    "appId": "1:365112842534:web:e3805cc81ad2a4c15309e7",
+    "measurementId": "G-T4KZ8VJ8JT"}
+    
+    firebase=pyrebase.initialize_app(firebaseConfig)
+    db=firebase.database()
+    path=r'C:\Users\SMAA\creds1.json'
+    gc=pygsheets.authorize(service_account_file='creds1.json')
+    sh=gc.open('HEADER')
+    #sh1=gc.open('BNFSOURCE2606')
+    #sh2=gc.open('FUTURESCREENER')
+    wk1=sh[1]
+    nft=wk1.get_as_df(start='A1',end='B23')
+    nfttrend = nft.iloc[0,1]
+    nftspot = nft.iloc[1,1]
+    nftmaxpain = nft.iloc[2,1]
+    nftnetchange = nft.iloc[3,1]
+    nftdemand = nft.iloc[4,1]
+    nftsupply = nft.iloc[5,1]
+    nftceprem= nft.iloc[6,1]
+    nftpeprem= nft.iloc[7,1]
+    nftintratrend= nft.iloc[8,1]
+    nftcebuypoints= nft.iloc[9,1]
+    nftpebuypoints=nft.iloc[10,1]
+    bnfttrend = nft.iloc[11,1]
+    bnftspot = nft.iloc[12,1]
+    bnftmaxpain = nft.iloc[13,1]
+    bnftnetchange = nft.iloc[14,1]
+    bnftdemand = nft.iloc[15,1]
+    bnftsupply = nft.iloc[16,1]
+    bnftceprem= nft.iloc[17,1]
+    bnftpeprem= nft.iloc[18,1]
+    bnftintratrend= nft.iloc[19,1]
+    bnftcebuypoints= nft.iloc[20,1]
+    bnftpebuypoints=nft.iloc[21,1]
+    #print(print1)
+    #wk2=sh1[0]
+    #wk3=sh2[0]
+    #celtp = result['celtp']
+    #ceprchng = result['ceprchng']
+    #nfttrend = nfttrend.to_json()
+    #niftyspot = nftspot.to_json()
+    #json= result.to_json()
+    #print(json)
+    print(nftspot)
+    nifty={"niftyspot":nftspot,"niftytrend":nfttrend,"niftynetchange":nftnetchange,"niftymaxpain":nftmaxpain,"niftydemand":nftdemand,"niftysupply":nftsupply,"niftyceprem":nftceprem,"niftypeprem":nftpeprem,"nftintratrend":nftintratrend,"nftcebuypoints":nftcebuypoints,"nftpebuypoints":nftpebuypoints,"bniftyspot":bnftspot,"bniftytrend":bnfttrend,"bniftynetchange":bnftnetchange,"bniftymaxpain":bnftmaxpain,"bniftydemand":bnftdemand,"bniftysupply":bnftsupply,"bniftyceprem":bnftceprem,"bniftypeprem":bnftpeprem,"bnftintratrend":bnftintratrend,"bnftcebuypoints":bnftcebuypoints,"bnftpebuypoints":bnftpebuypoints}
+    #niftytrend={"niftytrend":nfttrend}
+    #db.update(data)
+    db.update(nifty)
+    print(nifty)
+    #db.child('nifty').update({"niftyspot":niftyspot})
+    #db.child('nifty').update({"ceprchng":ceprchng})
+    #db.update(json)
+    #wk1.set_dataframe(result,(2,1))
+    #wk2.set_dataframe(result1,(2,1))
+    #wk3.set_dataframe(nftsresult,(1,1))
+    #print(current_time+' '+'DATA RECORDED SUCCESSFULLY')
     #schedule.every(1).minutes.do(datafetch)
-
-        now = datetime.now(timezone('Asia/Kolkata'))
-        current_time = now.strftime("%H:%M:%S")
-        logging.info(f"{current_time} - Data recorded successfully.")
-    except Exception as e:
-        logging.error(f"Error in datafetch: {e}")
-        raise  # Re-raise the exception to restart the program
-
-if __name__ == "__main__":
-    gc = pygsheets.authorize(service_account_file='creds1.json')
-
-    while True:
-        try:
-            datafetch()
-            time.sleep(5)
-        except Exception as e:
-            logging.error(f"Unhandled exception: {e}")
+    #schedule.every(1).minutes.do(nft2gsheet)
+    keep_alive()
+while True:
+    datafetch()
+    time.sleep(5)
+  
