@@ -6,7 +6,6 @@ import numpy as np
 import time
 from datetime import datetime,timedelta,date
 import pygsheets
-from lxml import etree as et
 import calendar
 import pyrebase
 def datafetch():
