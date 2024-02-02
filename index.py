@@ -1,5 +1,4 @@
 import streamlit as st
-from keep_alive import keep_alive
 import json
 from pytz import timezone 
 import pandas as pd
@@ -75,7 +74,6 @@ def datafetch():
     #print(current_time+' '+'DATA RECORDED SUCCESSFULLY')
     #schedule.every(1).minutes.do(datafetch)
     #schedule.every(1).minutes.do(nft2gsheet)
-    keep_alive()
 while True:
     datafetch()
     time.sleep(5)
