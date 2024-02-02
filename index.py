@@ -110,7 +110,6 @@ def datafetch():
         raise  # Re-raise the exception to restart the program
 
 if __name__ == "__main__":
-   
     gc = pygsheets.authorize(service_account_file='creds1.json')
 
     while True:
