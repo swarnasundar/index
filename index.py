@@ -1,79 +1,103 @@
-import streamlit as st
-import json
-from pytz import timezone 
+import requests
+import concurrent.futures
 import pandas as pd
-import numpy as np
 import time
-from datetime import datetime,timedelta,date
 import pygsheets
-import calendar
-import pyrebase
-def datafetch():
-    firebaseConfig ={"apiKey": "AIzaSyDRCNxFhkbWwjanpPBGLBb7plPISrnhowU",
-    "authDomain": "dash-92a7e.firebaseapp.com",
-    "databaseURL": "https://dash-92a7e-default-rtdb.firebaseio.com/",
-    "projectId": "dash-92a7e",
-    "storageBucket": "dash-92a7e.appspot.com",
-    "messagingSenderId": "365112842534",
-    "appId": "1:365112842534:web:e3805cc81ad2a4c15309e7",
-    "measurementId": "G-T4KZ8VJ8JT"}
-    
-    firebase=pyrebase.initialize_app(firebaseConfig)
-    db=firebase.database()
-    path=r'C:\Users\SMAA\creds1.json'
-    gc=pygsheets.authorize(service_account_file='creds1.json')
-    sh=gc.open('HEADER')
-    #sh1=gc.open('BNFSOURCE2606')
-    #sh2=gc.open('FUTURESCREENER')
-    wk1=sh[1]
-    nft=wk1.get_as_df(start='A1',end='B23')
-    nfttrend = nft.iloc[0,1]
-    nftspot = nft.iloc[1,1]
-    nftmaxpain = nft.iloc[2,1]
-    nftnetchange = nft.iloc[3,1]
-    nftdemand = nft.iloc[4,1]
-    nftsupply = nft.iloc[5,1]
-    nftceprem= nft.iloc[6,1]
-    nftpeprem= nft.iloc[7,1]
-    nftintratrend= nft.iloc[8,1]
-    nftcebuypoints= nft.iloc[9,1]
-    nftpebuypoints=nft.iloc[10,1]
-    bnfttrend = nft.iloc[11,1]
-    bnftspot = nft.iloc[12,1]
-    bnftmaxpain = nft.iloc[13,1]
-    bnftnetchange = nft.iloc[14,1]
-    bnftdemand = nft.iloc[15,1]
-    bnftsupply = nft.iloc[16,1]
-    bnftceprem= nft.iloc[17,1]
-    bnftpeprem= nft.iloc[18,1]
-    bnftintratrend= nft.iloc[19,1]
-    bnftcebuypoints= nft.iloc[20,1]
-    bnftpebuypoints=nft.iloc[21,1]
-    #print(print1)
-    #wk2=sh1[0]
-    #wk3=sh2[0]
-    #celtp = result['celtp']
-    #ceprchng = result['ceprchng']
-    #nfttrend = nfttrend.to_json()
-    #niftyspot = nftspot.to_json()
-    #json= result.to_json()
-    #print(json)
-    print(nftspot)
-    nifty={"niftyspot":nftspot,"niftytrend":nfttrend,"niftynetchange":nftnetchange,"niftymaxpain":nftmaxpain,"niftydemand":nftdemand,"niftysupply":nftsupply,"niftyceprem":nftceprem,"niftypeprem":nftpeprem,"nftintratrend":nftintratrend,"nftcebuypoints":nftcebuypoints,"nftpebuypoints":nftpebuypoints,"bniftyspot":bnftspot,"bniftytrend":bnfttrend,"bniftynetchange":bnftnetchange,"bniftymaxpain":bnftmaxpain,"bniftydemand":bnftdemand,"bniftysupply":bnftsupply,"bniftyceprem":bnftceprem,"bniftypeprem":bnftpeprem,"bnftintratrend":bnftintratrend,"bnftcebuypoints":bnftcebuypoints,"bnftpebuypoints":bnftpebuypoints}
-    #niftytrend={"niftytrend":nfttrend}
-    #db.update(data)
-    db.update(nifty)
-    print(nifty)
-    #db.child('nifty').update({"niftyspot":niftyspot})
-    #db.child('nifty').update({"ceprchng":ceprchng})
-    #db.update(json)
-    #wk1.set_dataframe(result,(2,1))
-    #wk2.set_dataframe(result1,(2,1))
-    #wk3.set_dataframe(nftsresult,(1,1))
-    #print(current_time+' '+'DATA RECORDED SUCCESSFULLY')
-    #schedule.every(1).minutes.do(datafetch)
-    #schedule.every(1).minutes.do(nft2gsheet)
+from datetime import datetime
+
+def fetch_option_data(option):
+    # Function to fetch data for a single option
+    return {
+        'calls_oi': option['calls_oi'],
+        'calls_change_oi': option['calls_change_oi'],
+        'calls_volume': option['calls_volume'],
+        'calls_ltp': option['calls_ltp'],
+        'calls_net_change': option['calls_net_change'],
+        'calls_iv': option['calls_iv'],
+        'calls_open': option['call_open'],
+        'calls_high': option['call_high'],
+        'calls_low': option['call_low'],
+        'strike_price': option['strike_price'],
+        'puts_oi': option['puts_oi'],
+        'puts_change_oi': option['puts_change_oi'],
+        'puts_volume': option['puts_volume'],
+        'puts_ltp': option['puts_ltp'],
+        'puts_net_change': option['puts_net_change'],
+        'puts_iv': option['puts_iv'],
+        'puts_open': option['put_open'],
+        'puts_high': option['put_high'],
+        'puts_low': option['put_low'],
+        'spotprice': option['index_close'],
+  # Added symbol_name to extract the symbol name
+    }
+
+def fetch_option_chain_data(api_url):
+    response = requests.get(api_url)
+
+    if response.status_code == 200:
+        data = response.json()
+        op_datas = data['resultData']['opDatas']
+
+        # Use ThreadPoolExecutor to parallelize the API requests
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            options_data = list(executor.map(fetch_option_data, op_datas))
+
+        # Creating a DataFrame
+        df = pd.DataFrame(options_data)
+
+        return df
+    else:
+        print(f"Error: {response.status_code}, {response.text}")
+        return None
+
+def run_program(url_info):
+    api_url = url_info['api_url']
+
+    option_chain_df = fetch_option_chain_data(api_url)
+
+    if option_chain_df is not None:
+        print(option_chain_df)
+        gc = pygsheets.authorize(service_account_file='creds1.json')
+        sh = gc.open('option_data')  # Replace with your actual Google Sheets document name
+
+        # Map predefined names to URLs
+        predefined_symbol_names = {
+            'https://webapi.niftytrader.in/webapi/option/fatch-option-chain?symbol=nifty&expiryDate=': 'NIFTY',
+            'https://webapi.niftytrader.in/webapi/option/fatch-option-chain?symbol=banknifty&expiryDate=': 'BANKNIFTY',
+            'https://webapi.niftytrader.in/webapi/option/fatch-option-chain?symbol=finnifty&expiryDate=': 'FINNIFTY',
+            # Add more mappings for additional URLs
+        }
+
+        # Extract the URL from the dictionary
+        current_url = url_info['api_url']
+
+        # Extract the predefined symbol name or use the URL as a fallback
+        symbol_name = predefined_symbol_names.get(current_url, current_url)
+
+        # Find the worksheet with the same symbol name
+        worksheet = sh.worksheet_by_title(symbol_name)
+
+        if worksheet:
+            # If the worksheet exists, update its content
+            worksheet.set_dataframe(option_chain_df, (1, 1))
+            print(f'Data updated for {symbol_name} successfully')
+        else:
+            # If the worksheet doesn't exist, create a new worksheet
+            new_worksheet = sh.add_worksheet(symbol_name)
+            new_worksheet.set_dataframe(option_chain_df, (1, 1))
+            print(f'Data recorded for {symbol_name} successfully')
+
+# List of URLs
+url_infos = [
+    {'api_url': 'https://webapi.niftytrader.in/webapi/option/fatch-option-chain?symbol=nifty&expiryDate='},
+    {'api_url': 'https://webapi.niftytrader.in/webapi/option/fatch-option-chain?symbol=banknifty&expiryDate='},
+    {'api_url': 'https://webapi.niftytrader.in/webapi/option/fatch-option-chain?symbol=finnifty&expiryDate='},
+    # Add more dictionaries for additional URLs
+]
+
+
+# Run the program every 20 seconds for each URL
 while True:
-    datafetch()
-    time.sleep(5)
-  
+    for url_info in url_infos:
+        run_program(url_info)
+    time.sleep(50)
